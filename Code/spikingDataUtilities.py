@@ -24,7 +24,7 @@ def loadMATData(session):
     return out
 
 def restrict(samples,intervals,s_ind=False):
-    # keep only samples falling in a list of intervals
+    # keep only samples falling in a set of intervals
     #
     # arguments:
     #     samples      (n,m) float, every row is [time stamp, value1, value2, …]
