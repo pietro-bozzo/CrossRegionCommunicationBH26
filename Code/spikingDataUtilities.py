@@ -28,12 +28,12 @@ def restrict(samples,intervals,s_ind=False):
     #
     # output:
     #     samples      (p,m) float, restricted samples, i. e., samples[:,0] fall into intervals
-    #     indices      (n) bool, optional
+    #     indices      (n) bool, optional, indicese of original samples which were kept
 
-    is_ok = np.false((samples.shape[0]))
+    is_ok = np.full((samples.shape[0]),False)
     for interval in intervals:
-        is_ok = is_ok | (samples[:,0] > interval[0] & samples[:,0] < interval[1])
+        is_ok = is_ok | ((samples[:,0] > interval[0]) & (samples[:,0] < interval[1]))
 
     if s_ind:
-        return samples, is_ok
-    return samples
+        return samples[is_ok], is_ok
+    return samples[is_ok]
