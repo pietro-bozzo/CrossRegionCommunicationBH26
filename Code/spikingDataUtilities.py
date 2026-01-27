@@ -1,9 +1,9 @@
-''' Utility functions to handle spiking data
+'''
+Utility functions to handle spiking data
 
-Copyright (C) 2025 by Pietro Bozzo, Gabriele Casagrande, Gianmarco Cafaro, Giacomo Preti
-
-This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 3 of the License, or (at your option) any later version.'''
+SPDX-License-Identifier: GPL-3.0-or-later
+Copyright © 2026 by Pietro Bozzo, Gabriele Casagrande, Gianmarco Cafaro, Giacomo Preti
+'''
 
 from scipy.io import loadmat
 import numpy as np
