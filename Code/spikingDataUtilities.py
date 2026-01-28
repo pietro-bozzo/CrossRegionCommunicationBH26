@@ -44,6 +44,8 @@ def restrict(samples,intervals,s_ind=False):
     
     is_ok = np.full((samples.shape[0]),False)
     for interval in intervals:
+        if len(interval) < 2:
+            raise(ValueError('intervals must be a (n,2) array'))
         is_ok = is_ok | ((samples[:,0] > interval[0]) & (samples[:,0] < interval[1]))
 
     if s_ind:
