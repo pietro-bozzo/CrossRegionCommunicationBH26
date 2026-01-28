@@ -42,3 +42,35 @@ def restrict(samples,intervals,s_ind=False):
     if s_ind:
         return samples[is_ok], is_ok
     return samples[is_ok]
+
+def consolidateIntervals(intervals):
+    # remove overlaps in a set of intervals, yielding its most compact description (the union of its elements)
+    # e.g., [[1,4],[2,6]] will become [1,6]
+    #
+    # arguments:
+    #     intervals    (:,2) float, every row is [start time, stop time] for an interval
+
+    # sort by start time
+    intervals = intervals[intervals[:, 0].argsort()]
+
+    # flatten and argsort to find overlaps
+    intervals = intervals.flatten()
+    ind = intervals.argsort()
+
+    # remove all ind which are followed by at least one smaller element
+    m = ind[-2:].min()
+    is_ok = [True,ind[-2] < ind[-1]]
+    for i in range(3,ind.shape[0]+1):
+        is_ok.append(ind[-i] < m)
+        m = min(ind[-i],m)
+    is_ok.reverse()
+    ind = ind[is_ok]
+
+    # remove consecutive odd elements
+    is_odd = (ind % 2).astype(bool)
+    ind = ind[np.concatenate((~is_odd[:-1] | ~is_odd[1:],[True]))]
+
+    # rebuild intervals
+    intervals = intervals[np.reshape(ind,(ind.shape[0]//2,2))]
+
+    return intervals
