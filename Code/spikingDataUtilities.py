@@ -35,6 +35,11 @@ def restrict(samples,intervals,s_ind=False):
     #     samples      (p,m) float, restricted samples, i. e., samples[:,0] fall into intervals
     #     indices      (n) bool, optional, indicese of original samples which were kept
 
+    try:
+        samples = np.array(samples)
+    except Exception as e:
+        raise e
+    
     is_ok = np.full((samples.shape[0]),False)
     for interval in intervals:
         is_ok = is_ok | ((samples[:,0] > interval[0]) & (samples[:,0] < interval[1]))
@@ -50,8 +55,20 @@ def consolidateIntervals(intervals):
     # arguments:
     #     intervals    (:,2) float, every row is [start time, stop time] for an interval
 
+    try:
+        intervals = np.array(intervals)
+    except Exception as e:
+        raise e
+    # promote 1d arrays to 2d
+    if len(intervals.shape) == 1:
+        intervals = intervals.reshape((1,-1))
+    if intervals.shape[1] != 2:
+        raise(ValueError('intervals must be a (n,2) array'))
+    if (intervals[:,0] > intervals[:,1]).any():
+        raise(ValueError('rows of intervals must be increasing'))
+
     # sort by start time
-    intervals = intervals[intervals[:, 0].argsort()]
+    intervals = intervals[intervals[:,0].argsort()]
 
     # flatten and argsort to find overlaps
     intervals = intervals.flatten()
@@ -79,13 +96,14 @@ def intersectIntervals(intervals):
     # intersect interval sets, obtaining the set of intervals which are contained in all inputs
     #
     # arguments:
-    #     intervals       (n) list of (:,2), every element is a set of [start time, stop time] intervals, start times are
-    #                     assumed to be sorted
+    #     intervals       (n) list of (:,2), every element is a set of [start time, stop time] intervals
     #
     # output:
     #     intersection    (:,2) float, intersection between elements of input
 
-    # 1: more than 2 intervals, recursive call TO IMPLEMENT
+    # 1: more than 2 intervals, recursive call
+    if len(intervals) > 2:
+        intervals = [intervals[0],intersectIntervals(intervals[1:])]
 
     # 2: intersect 2 interval sets
 
