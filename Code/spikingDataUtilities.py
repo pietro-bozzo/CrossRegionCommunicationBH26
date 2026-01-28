@@ -37,6 +37,11 @@ def restrict(samples,intervals,s_ind=False):
     #     samples      (p,m) float, restricted samples, i. e., samples[:,0] fall into intervals
     #     indices      (n) bool, optional, indicese of original samples which were kept
 
+    try:
+        samples = np.array(samples)
+    except Exception as e:
+        raise e
+    
     is_ok = np.full((samples.shape[0]),False)
     for interval in intervals:
         is_ok = is_ok | ((samples[:,0] > interval[0]) & (samples[:,0] < interval[1]))
@@ -53,8 +58,20 @@ def consolidateIntervals(intervals):
     # arguments:
     #     intervals    (:,2) float, every row is [start time, stop time] for an interval
 
+    try:
+        intervals = np.array(intervals)
+    except Exception as e:
+        raise e
+    # promote 1d arrays to 2d
+    if len(intervals.shape) == 1:
+        intervals = intervals.reshape((1,-1))
+    if intervals.shape[1] != 2:
+        raise(ValueError('intervals must be a (n,2) array'))
+    if (intervals[:,0] > intervals[:,1]).any():
+        raise(ValueError('rows of intervals must be increasing'))
+
     # sort by start time
-    intervals = intervals[intervals[:, 0].argsort()]
+    intervals = intervals[intervals[:,0].argsort()]
 
     # flatten and argsort to find overlaps
     intervals = intervals.flatten()
@@ -77,6 +94,63 @@ def consolidateIntervals(intervals):
     intervals = intervals[np.reshape(ind,(ind.shape[0]//2,2))]
 
     return intervals
+
+
+def intersectIntervals(intervals):
+    # intersect interval sets, obtaining the set of intervals which are contained in all inputs
+    #
+    # arguments:
+    #     intervals       (n) list of (:,2), every element is a set of [start time, stop time] intervals
+    #
+    # output:
+    #     intersection    (:,2) float, intersection between elements of input
+
+    # 1: more than 2 intervals, recursive call
+    if len(intervals) > 2:
+        intervals = [intervals[0],intersectIntervals(intervals[1:])]
+
+    # 2: intersect 2 interval sets
+
+    # consolidate every interval set
+    intervals = [consolidateIntervals(i) for i in intervals]
+
+    # flatten both sets
+    a = intervals[0].flatten()
+    b = intervals[1].flatten()
+
+    # ind[i] is odd iff a[i] falls in an interval of b
+    ind = np.digitize(a,b)
+
+    # handle case when a ∋ [10,20] and b ∋ [20,35] : interval [20,20] must not be in result
+    end_nz = ((ind != 0) & (np.arange(ind.shape[0]) % 2)).astype(bool) # end_nz[i] is 1 iff ind[i] is not 0 and i is odd
+    change_ind = a[end_nz] == b[ind[end_nz]-1] # change_ind[j] is 1 iff corresponding interval must be shortened
+    find_end_nz = np.where(end_nz)[0]
+    ind[find_end_nz[change_ind]] -= 1
+
+    # if ind[2*i-1], ind[2*i] are equal and even, it's an interval of a to exclude entirely
+    keep_ind = ((ind[::2] % 2).astype(bool) | (ind[::2] != ind[1::2])).repeat(2)
+    ind = ind[keep_ind]
+    a = a[keep_ind]
+
+    # odd_ind[i] is index of an odd element of ind, which will be replaced by a[odd_ind[i]]
+    odd_ind = np.where(ind % 2)[0]
+    # round start to lower even number and stop to lower odd number
+    start = ind[::2] - ind[::2] % 2
+    stop = ind[1::2] -1 + ind[1::2] % 2
+    # expand each start[i], stop[i] pair to include intervals in between
+    new_ind = np.array([np.arange(start[i],stop[i]+1) for i in range(start.shape[0])]).flatten().astype(int)
+    # remap odd_ind to point elements of new_ind, which will have to be drawn from a
+    remapping = np.array([np.ones(start.shape),stop-start]).flatten('F').cumsum() - 1# CHECK IF 'F' IS OK
+    new_odd_ind = remapping[odd_ind].astype(int) # remapping CONTAINS MATLAB style indeces!!
+
+    # initialize intervals as [b[new_ind[i]],b[new_ind[i+1]]]
+    intersection = b[new_ind]
+    # when ind[j] was odd, replace corresponding element with a[odd_ind[j]]
+    intersection[new_odd_ind] = a[odd_ind]
+    # return as interval set
+    intersection = intersection.reshape((intersection.shape[0]//2,2))
+
+    return intersection
 
 
 def spikeTimes(data, protocol_times, protocol_based=True):
