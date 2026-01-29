@@ -26,17 +26,20 @@ def loadMATData(session):
     return out
 
 
-def restrict(samples,intervals,s_ind=False):
+def restrict(samples,intervals,shift=False,s_ind=False,i_ind=False):
     # keep only samples falling in a set of intervals
     #
     # arguments:
     #     samples      (n,m) float, every row is [time stamp, value1, value2, …]
     #     intervals    (l,2) float, every row is [start time, stop time] for an interval
-    #     s_ind        bool = False, if True, return also indices of kept samples in original samples
+    #     shift        bool = False, if True, shift remaining epochs together in time
+    #     s_ind        bool = False, if True, return also Is
+    #     i_ind        bool = False, if True, return also Ii
     #
     # output:
     #     samples      (p,m) float, restricted samples, i. e., samples[:,0] fall into intervals
-    #     indices      (n) bool, optional, indicese of original samples which were kept
+    #     Is           (n) bool, optional, indicese of original samples which were kept
+    #     Ii           (n) bool, optional, indicese of intervals which contain kept samples
 
     try:
         samples = np.array(samples)
@@ -49,16 +52,28 @@ def restrict(samples,intervals,s_ind=False):
         samples = samples.reshape((-1,1))
     if intervals.ndim == 1:
         intervals = intervals.reshape((1,-1))
-    
-    is_ok = np.full((samples.shape[0]),False)
-    for interval in intervals:
-        if len(interval) < 2:
-            raise(ValueError('intervals must be a (n,2) array'))
-        is_ok = is_ok | ((samples[:,0] > interval[0]) & (samples[:,0] < interval[1]))
 
-    if s_ind:
-        return samples[is_ok], is_ok
-    return samples[is_ok]
+    # consolidate intervals to use vectorized algorithm
+    intervals = consolidateIntervals(intervals)
+
+    # assign and index to each sample time, only odd indeces belong to intervals
+    ind = np.digitize(samples[:,0],intervals.flatten())
+    is_ok = (ind % 2).astype(bool) # is_ok[i] is 1 iff samples[i] must be kept
+    samples = samples[is_ok]
+    Ii = (ind[is_ok] - 1) // 2 # Ii[j] indexes interval that contains samples[is_ok][j]
+
+    if shift:
+        # cumulative shifts: distances between intervals
+        ii_distance = intervals[1:,0] - intervals[:-1,1]
+        cum_shift = np.concatenate(([0],np.cumsum(ii_distance)))
+        # assign cumulative shifts to samples
+        shifts = cum_shift[Ii]
+        samples[:,0] = samples[:,0] - shifts - intervals[0,0]
+
+    if not s_ind and not i_ind:
+        return samples   
+    out = (samples, is_ok, Ii) # prepare tuple to return requested outputs
+    return out[:2+i_ind:2-s_ind]
 
 
 def consolidateIntervals(intervals):
