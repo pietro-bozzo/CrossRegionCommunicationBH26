@@ -197,3 +197,48 @@ def spikeTimes(data, protocol_times, protocol_based=True):
         protocol_rasters.append(single_raster)
         
     return protocol_rasters
+
+
+def firingRate(spikes,start=None,stop=None,bin_size=0.05):
+    # estimate istantaneous firing rate from spike times
+    #
+    # arguments:
+    #     spikes         (n,:) float, every row is either [spike time] or [spike time, unit id]
+    #     start          float = min(spike_times) s, time to start count at
+    #     stop           float = max(spike_times) s, time to stop count at
+    #     bin_size       float = 0.05 s, time bin to count spikes
+    #
+    # output:
+    #     firing_rate    (:,m+1) float, every row is [time stamp, firing rates for m units], m is 1 if spikes has just one column
+
+    try:
+        spikes = np.array(spikes)
+    except Exception as e:
+        raise e
+    
+    if spikes.ndim == 1:
+        times = spikes
+        units = []
+    else:
+        times = spikes[:,0]
+        units = spikes[:,1]
+    
+    if start is None:
+        start = times.min()
+    if stop is None:
+        stop = times.max()
+    time_bins = np.arange(start,stop+bin_size,bin_size)
+    
+    if len(units) == 0:
+        # compute firing rate once
+        counts, _ = np.histogram(times,bins=time_bins)
+        firing_rate = (counts).reshape((-1,1)) / bin_size
+    else:
+        # compute firing rate once per unit and stack into a matrix
+        firing_rate = [np.histogram(times[units==u],bins=time_bins)[0] for u in np.unique(units)]
+        firing_rate = np.array(firing_rate).T / bin_size
+
+    # center times into time bins
+    time_bins = np.reshape((time_bins[:-1] + time_bins[1:]) / 2,(-1,1))
+
+    return np.concatenate((time_bins,firing_rate),1)
