@@ -224,9 +224,11 @@ def firingRate(spikes,start=None,stop=None,bin_size=0.05,smooth=None):
     except Exception as e:
         raise e
     
+    units = []
     if spikes.ndim == 1:
         times = spikes
-        units = []
+    elif spikes.shape[1] == 1:
+        times = spikes.reshape(-1)
     else:
         times = spikes[:,0]
         units = spikes[:,1]
