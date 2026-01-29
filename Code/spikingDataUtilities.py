@@ -6,6 +6,7 @@ Copyright © 2026 by Pietro Bozzo, Gabriele Casagrande, Gianmarco Cafaro, Giacom
 '''
 
 from scipy.io import loadmat
+from scipy.ndimage import gaussian_filter
 import numpy as np
 
 
@@ -206,7 +207,7 @@ def spikeTimes(data, protocol_times, protocol_based=True):
     return protocol_rasters
 
 
-def firingRate(spikes,start=None,stop=None,bin_size=0.05):
+def firingRate(spikes,start=None,stop=None,bin_size=0.05,smooth=None):
     # estimate istantaneous firing rate from spike times
     #
     # arguments:
@@ -223,9 +224,11 @@ def firingRate(spikes,start=None,stop=None,bin_size=0.05):
     except Exception as e:
         raise e
     
+    units = []
     if spikes.ndim == 1:
         times = spikes
-        units = []
+    elif spikes.shape[1] == 1:
+        times = spikes.reshape(-1)
     else:
         times = spikes[:,0]
         units = spikes[:,1]
@@ -247,5 +250,9 @@ def firingRate(spikes,start=None,stop=None,bin_size=0.05):
 
     # center times into time bins
     time_bins = np.reshape((time_bins[:-1] + time_bins[1:]) / 2,(-1,1))
+
+    # apply smoothing
+    if smooth is not None:
+        firing_rate = gaussian_filter(firing_rate,smooth,axes=0)
 
     return np.concatenate((time_bins,firing_rate),1)
