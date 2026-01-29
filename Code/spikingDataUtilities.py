@@ -39,8 +39,15 @@ def restrict(samples,intervals,s_ind=False):
 
     try:
         samples = np.array(samples)
+        intervals = np.array(intervals)
     except Exception as e:
         raise e
+    
+    # promote 1d arrays to 2d
+    if samples.ndim == 1:
+        samples = samples.reshape((-1,1))
+    if intervals.ndim == 1:
+        intervals = intervals.reshape((1,-1))
     
     is_ok = np.full((samples.shape[0]),False)
     for interval in intervals:
