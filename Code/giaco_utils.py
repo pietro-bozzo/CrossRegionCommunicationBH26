@@ -130,7 +130,7 @@ def run_kmeans(X, k):
     scaler = StandardScaler()
     X_z = scaler.fit_transform(X)
 
-    pca = PCA(n_components=20)
+    pca = PCA(n_components=15)
     X_pca = pca.fit_transform(X_z)
 
     labels = KMeans(k).fit_predict(X_pca)
@@ -150,3 +150,59 @@ def silhouette_for_kmeans(X):
     scores = np.array(scores).reshape(10,6)
     plt.plot(scores.mean(axis=0))
     plt.xticks(range(vmax-vmin), range(vmin, vmax))
+
+def get_sleep_labels_for_fcd(window_length, overlap, bin_size, FC_t, data):
+    """
+    Docstring per get_sleep_labels_for_fcd
+    
+    :param window_length: window length for the computation of the FCD
+    :param overlap: overlap between windows for the computation of the FCD
+    :param bin_size: used for the computation of the firing rate, in seconds
+    :param FC_t: flattened FC data from the FCD 
+    :param data: data loaded from the .mat file 
+    """
+    window_step = window_length - overlap
+    fs = 1/bin_size
+    n_windows = FC_t.shape[1]
+    window_starts = np.arange(n_windows) * window_step / fs
+    window_ends   = window_starts + window_length / fs
+
+    sleep_start = 1454
+
+    window_starts_abs = window_starts + sleep_start
+    window_ends_abs   = window_ends   + sleep_start
+
+    window_times = np.c_[window_starts_abs, window_ends_abs]
+
+    def overlap_duration(win, interval):
+        start = max(win[0], interval[0])
+        end   = min(win[1], interval[1])
+        return max(0.0, end - start)
+
+    def assign_state(window, wake, rem, nrem):
+        overlaps = {
+            "wake": sum(overlap_duration(window, i) for i in wake),
+            "rem":  sum(overlap_duration(window, i) for i in rem),
+            "nrem": sum(overlap_duration(window, i) for i in nrem),
+        }
+        return max(overlaps, key=overlaps.get)
+
+    states = []
+
+    for w in window_times:
+        states.append(
+            assign_state(
+                w,
+                data["wake"],
+                data["rem"],
+                data["nrem"]
+            )
+        )
+
+    states = np.array(states)
+    assert states.shape == (n_windows,)
+
+    return states
+
+
+
