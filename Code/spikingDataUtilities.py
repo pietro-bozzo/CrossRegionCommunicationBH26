@@ -222,7 +222,7 @@ def spikeTimes(data, protocol_times, protocol_based=True):
     return protocol_rasters
 
 
-def firingRate(spikes,start=None,stop=None,bin_size=0.05,smooth=None):
+def firingRate(spikes,start=None,stop=None,bin_size=0.05,step=1,smooth=None):
     # estimate istantaneous firing rate from spike times
     #
     # arguments:
@@ -230,14 +230,19 @@ def firingRate(spikes,start=None,stop=None,bin_size=0.05,smooth=None):
     #     start          float = min(spike_times) s, time to start count at
     #     stop           float = max(spike_times) s, time to stop count at
     #     bin_size       float = 0.05 s, time bin to count spikes
+    #     step           int = 1, firing rate is computed in windows of length 'binSize' and overlap 'binSize' / 'step',
+    #                    default is no overlap
     #
     # output:
     #     firing_rate    (:,m+1) float, every row is [time stamp, firing rates for m units], m is 1 if spikes has just one column
 
+    # validate input
     try:
         spikes = np.array(spikes)
     except Exception as e:
         raise e
+    if step % 1 or step == 0:
+        raise(ValueError('\'step\' must be a non-zero integer'))
     
     units = []
     if spikes.ndim == 1:
@@ -248,23 +253,29 @@ def firingRate(spikes,start=None,stop=None,bin_size=0.05,smooth=None):
         times = spikes[:,0]
         units = spikes[:,1]
     
+    # build time bins, overlapping if requested
     if start is None:
         start = times.min()
     if stop is None:
         stop = times.max()
-    time_bins = np.arange(start,stop+bin_size,bin_size)
+    time_bins = [np.arange(start,stop+bin_size,bin_size) + i*bin_size/step for i in range(step)]
     
     if len(units) == 0:
         # compute firing rate once
-        counts, _ = np.histogram(times,bins=time_bins)
-        firing_rate = (counts).reshape((-1,1)) / bin_size
+        firing_rate = [np.histogram(times,bins=tb)[0] for tb in time_bins]
+        # flatten and convert to Hz
+        firing_rate = np.array(firing_rate).reshape((-1,1),order='F') / bin_size
     else:
         # compute firing rate once per unit and stack into a matrix
-        firing_rate = [np.histogram(times[units==u],bins=time_bins)[0] for u in np.unique(units)]
+        firing_rate = []
+        for u in np.unique(units):
+            fr = [np.histogram(times[units==u],bins=tb)[0] for tb in time_bins]
+            firing_rate.append(np.array(fr).flatten('F'))
         firing_rate = np.array(firing_rate).T / bin_size
 
     # center times into time bins
-    time_bins = np.reshape((time_bins[:-1] + time_bins[1:]) / 2,(-1,1))
+    time_bins = [(tb[:-1] + tb[1:]) / 2 for tb in time_bins]
+    time_bins = np.array(time_bins).reshape((-1,1),order='F')
 
     # apply smoothing
     if smooth is not None:
