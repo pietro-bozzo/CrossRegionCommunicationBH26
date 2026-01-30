@@ -282,3 +282,47 @@ def firingRate(spikes,start=None,stop=None,bin_size=0.05,step=1,smooth=None):
         firing_rate = gaussian_filter(firing_rate,smooth,axes=0)
 
     return np.concatenate((time_bins,firing_rate),1)
+
+
+def shuffleEvents(events,offset=0):
+    # shuffle events preserving their inter-event interval
+    #
+    # arguments:
+    #     events      (:,n) float, every row is either [event time] or [event time, unit id]
+    #     offset      float = 0 s, reference time, necessary when spikes start at a time != 0, e.g., for a portion of a recording
+    #                 in [1000 s, 3000 s]; must be smaller than first spike time
+    #
+    # output:
+    #     shuffled    (:,n) float, every row is [time stamp, firing rates for m units], m is 1 if spikes has just one column
+
+    try:
+        events = np.array(events)
+    except Exception as e:
+        raise e
+    
+    # 1. single column input (only timestamps)
+    if events.ndim == 1 or events.shape[1] == 1:
+
+        # compute and shuffle inter-event intervals
+        inter_event_intervals = np.diff(events,prepend=offset,axis=0)
+        inter_event_intervals = np.random.permutation(inter_event_intervals)
+        shuffled = offset + np.cumsum(inter_event_intervals,axis=0)
+        return shuffled
+
+    # 2: multiple columns (also grouping ids)
+    times = events[:,0].reshape((-1,1))
+    ids = events[:,1:]
+    unique_ids = np.unique(ids,axis=0)
+
+    shuffled = []
+    for i in unique_ids:
+        # compute and shuffle inter-event intervals per group
+        inter_event_intervals = np.diff(times[(ids==i).all(1)],axis=0,prepend=offset)
+        inter_event_intervals = np.random.permutation(inter_event_intervals)
+        shuffled.append(np.concatenate((offset+np.cumsum(inter_event_intervals,axis=0),np.repeat(i.reshape((1,-1)),len(inter_event_intervals),axis=0)),axis=1))
+
+    # sort by time
+    shuffled = np.concatenate(shuffled)
+    shuffled = shuffled[shuffled[:,0].argsort()]
+
+    return shuffled
